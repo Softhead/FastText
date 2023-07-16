@@ -64,7 +64,7 @@ namespace CSharpBenchmark
             }
         }
 
-        [Params(10, 100)]//, 1000, 10_000, 1001)]
+        [Params(10, 100, 1000, 10_000, 1001)]
         public int n_;
 
         [GlobalSetup]

@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace CSharp
 {
@@ -149,8 +150,8 @@ namespace CSharp
 
         // other
         private uint nextAvailableAddress_ = 0;
-        private uint maximumAvailableAddress_ = 0;
-        private readonly List<UInt128[]> blocks_ = new();
+        private int maximumAvailableAddress_ = 0;
+        private UInt128[] blocks_;
         private readonly Barrier parseComplete_;
 
         private uint GetNextAvailableAddress()
@@ -158,10 +159,10 @@ namespace CSharp
             uint result = nextAvailableAddress_;
 
             nextAvailableAddress_++;
-            if (nextAvailableAddress_ > maximumAvailableAddress_)
+            if (nextAvailableAddress_ == maximumAvailableAddress_)
             {
                 maximumAvailableAddress_ += BlockSize;
-                blocks_.Add(new UInt128[BlockSize]);
+                Array.Resize(ref blocks_, maximumAvailableAddress_);
             }
 
             return result;
@@ -174,18 +175,18 @@ namespace CSharp
 
         public TrieLatin128Optimized(Stream s)
         {
-            blocks_.Add(new UInt128[BlockSize]);
-            maximumAvailableAddress_ = BlockSize - 1;
+            blocks_ = new UInt128[BlockSize];
+            maximumAvailableAddress_ = BlockSize;
 
             // Allocate 1 node to start;  this node is a placeholder that only contains addresses
             // and doesn't represent a character.
             nextAvailableAddress_ = 1;
 
             parseComplete_ = new Barrier(2);
-            Task.Run(async () => { await ParseStream(s); })
+            _ = Task.Run(async () => { await ParseStream(s).ConfigureAwait(false); })
                 .ContinueWith((t) =>
                 {
-                    if (t.IsFaulted) throw t.Exception;
+                    if (t.IsFaulted && t.Exception is not null) throw t.Exception;
                 });
             parseComplete_.SignalAndWait();
         }
@@ -255,12 +256,12 @@ namespace CSharp
 
             while (bytesRead != 0)
             {
-                bytesRead = await s.ReadAsync(buffer);
+                bytesRead = await s.ReadAsync(buffer).ConfigureAwait(false);
 
                 for (int i = 0; i < bytesRead; i++)
                 {
                     previousChar = currentChar;
-                    currentChar = char.ToLower((char)buffer.Span[i]);
+                    currentChar = char.ToLower((char)buffer.Span[i], CultureInfo.InvariantCulture);
 
                     // sequences of letters are treated as a word, and all other characters are considered whitespace
                     if (char.IsLetter(currentChar))
@@ -274,16 +275,14 @@ namespace CSharp
                             currentSpace = GetSpace(currentSection);
 
                             // first node is a placeholder, so check if our character's address has been filled in
-                            currentValue = blocks_[0][0];
+                            currentValue = blocks_[0];
                             currentAddress = GetAddressBySection(currentValue, currentSection);
 
                             if (currentAddress == 0)
                             {
                                 // initialize new block
                                 currentAddress = GetNextAvailableAddress();
-                                int newBlockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-                                int newMinorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
-                                blocks_[newBlockIndex][newMinorIndex] = ((UInt128)currentSection) << BitsToShiftSectionStopBits;
+                                blocks_[currentAddress] = ((UInt128)currentSection) << BitsToShiftSectionStopBits;
 
                                 // reserve space for values in this section
                                 for (int j = 1; j < currentSpace; j++)
@@ -292,23 +291,21 @@ namespace CSharp
                                 }
 
                                 // fill in address in placeholder block
-                                blocks_[0][0] = SetAddressBySection(currentValue, currentAddress, currentSection);
+                                blocks_[0] = SetAddressBySection(currentValue, currentAddress, currentSection);
                             }
                         }
                         else  // continue the current word
                         {
-                            int blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-                            int minorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
-                            currentValue = blocks_[blockIndex][minorIndex];
+                            uint precedingAddress = currentAddress;
+
+                            currentValue = blocks_[currentAddress];
                             currentAddress = GetAddressBySection(currentValue, currentSection);
 
                             if (currentAddress == 0)
                             {
                                 // initialize new block
                                 currentAddress = GetNextAvailableAddress();
-                                int newBlockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-                                int newMinorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
-                                blocks_[newBlockIndex][newMinorIndex] = SetSectionStopBitsInValue(0, (uint)currentSection);
+                                blocks_[currentAddress] = SetSectionStopBitsInValue(0, (uint)currentSection);
 
                                 // reserve space for values in this section
                                 currentSpace = SectionToSpaceMap[currentSection];
@@ -318,7 +315,7 @@ namespace CSharp
                                 }
 
                                 // fill in address in preceding block
-                                blocks_[blockIndex][minorIndex] = SetAddressBySection(currentValue, currentAddress, currentSection);
+                                blocks_[precedingAddress] = SetAddressBySection(currentValue, currentAddress, currentSection);
                             }
                         }
                     }
@@ -328,24 +325,16 @@ namespace CSharp
                         if (isCurrentlyInWord)
                         {
                             // mark the current position as the ending for a valid word
-                            int blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-                            int minorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
-
                             int currentIndex = GetIndex(previousChar);
-                            minorIndex += 1 + currentIndex / 4;
-                            if (minorIndex >= BlockSize)
-                            {
-                                blockIndex++;
-                                minorIndex -= BlockSize;
-                            }
-                            currentValue = blocks_[blockIndex][minorIndex];
+                            currentAddress += 1 + (uint)currentIndex / 4;
+                            currentValue = blocks_[currentAddress];
 
                             uint stopBits = GetSectionStopBitsFromValue(currentValue);
                             currentIndex %= 4;
                             stopBits |= (uint)(1 << currentIndex);
 
                             currentValue = SetSectionStopBitsInValue(currentValue, stopBits);
-                            blocks_[blockIndex][minorIndex] = currentValue;
+                            blocks_[currentAddress] = currentValue;
 
                             // ready for next word
                             currentAddress = 0;
@@ -359,24 +348,16 @@ namespace CSharp
             if (isCurrentlyInWord)
             {
                 // mark the current position as the ending for a valid word
-                int blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-                int minorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
-
                 int currentIndex = GetIndex(currentChar);
-                minorIndex += 1 + currentIndex / 4;
-                if (minorIndex >= BlockSize)
-                {
-                    blockIndex++;
-                    minorIndex -= BlockSize;
-                }
-                currentValue = blocks_[blockIndex][minorIndex];
+                currentAddress += 1 + (uint)currentIndex / 4;
+                currentValue = blocks_[currentAddress];
 
                 uint stopBits = GetSectionStopBitsFromValue(currentValue);
                 currentIndex %= 4;
                 stopBits |= (uint)(1 << currentIndex);
 
                 currentValue = SetSectionStopBitsInValue(currentValue, stopBits);
-                blocks_[blockIndex][minorIndex] = currentValue;
+                blocks_[currentAddress] = currentValue;
             }
 
             parseComplete_.SignalAndWait();
@@ -392,14 +373,10 @@ namespace CSharp
             UInt128 currentValue;
             uint currentAddress = 0;
             char currentChar = '\0';
-            int blockIndex;
-            int minorIndex;
             for (int i = 0; i < word.Length; i++)
             {
-                currentChar = char.ToLower(word[i]);
-                blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-                minorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
-                currentValue = blocks_[blockIndex][minorIndex];
+                currentChar = char.ToLower(word[i], CultureInfo.InvariantCulture);
+                currentValue = blocks_[currentAddress];
                 int currentSection = GetSection(currentChar);
                 currentAddress = GetAddressBySection(currentValue, currentSection);
                 if (currentAddress == 0)
@@ -408,16 +385,9 @@ namespace CSharp
                 }
             }
 
-            blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
-            minorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
             int currentIndex = GetIndex(currentChar);
-            minorIndex += 1 + currentIndex / 4;
-            if (minorIndex >= BlockSize)
-            {
-                blockIndex++;
-                minorIndex -= BlockSize;
-            }
-            currentValue = blocks_[blockIndex][minorIndex];
+            currentAddress += 1 + (uint)currentIndex / 4;
+            currentValue = blocks_[currentAddress];
             uint stopBits = GetSectionStopBitsFromValue(currentValue);
             currentIndex %= 4;
             if ((stopBits & (1 << currentIndex)) > 0)
