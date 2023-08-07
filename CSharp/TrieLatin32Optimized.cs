@@ -1,5 +1,4 @@
-﻿using System.Collections.Immutable;
-using System.Globalization;
+﻿using System.Globalization;
 
 namespace CSharp
 {
@@ -16,10 +15,6 @@ namespace CSharp
     //      Next 11 bits: unused
     //      Next 15 bits:  5 bits to store the 3 letters that are represented, in order MSB-LSB of 1, 2, 3.
     //                     Set 5 bits to 11111 to indicate that value has not been set yet.
-    // Next node:
-    //      MSB = 0
-    //      Next 2 bits: unused
-    //      Lower 29 bits: the ID of an address that points backwards to the address referencing this 3 character trie, in case it needs to be expanded.
     // Next 3 nodes:
     //      MSB = 0
     //      Next 2 bits: 00 = this is the first character in the 3 character trie
@@ -50,7 +45,8 @@ namespace CSharp
         private uint nextAvailableNode_ = 0;
         private uint maximumAvailableNode_ = 0;
         private readonly List<uint[]> blocks_ = new();
-        private Dictionary<uint, uint> backPointers_ = new();
+        private readonly Dictionary<uint, uint> backPointers_ = new();
+        private readonly Queue<uint> free3Tries_ = new();
         private readonly Barrier parseComplete_;
 
         public TrieLatin32Optimized(Stream s)
@@ -77,6 +73,26 @@ namespace CSharp
 
         private uint GetNextAvailableAddress(uint count)
         {
+            // take a free 3 character trie if possible
+            if (count == 4)
+            {
+                if (free3Tries_.Count != 0)
+                {
+                    if (free3Tries_.Count > 1)
+                    {
+                        int x = 5;
+                    }
+                    uint trie = free3Tries_.Dequeue();
+
+                    if (backPointers_.ContainsValue(trie))
+                    {
+                        int x = 5;
+                    }
+
+                    return trie;
+                }
+            }
+
             uint result = nextAvailableNode_;
 
             nextAvailableNode_ += count;
@@ -153,15 +169,15 @@ namespace CSharp
 
                                     if (currentCharIndex == currentNodeCharIndex[0])
                                     {
-                                        currentIndices.IncrementMinorIndex(2);
+                                        currentIndices.IncrementMinorIndex(1);
                                     }
                                     else if (currentCharIndex == currentNodeCharIndex[1])
                                     {
-                                        currentIndices.IncrementMinorIndex(3);
+                                        currentIndices.IncrementMinorIndex(2);
                                     }
                                     else if (currentCharIndex == currentNodeCharIndex[2])
                                     {
-                                        currentIndices.IncrementMinorIndex(4);
+                                        currentIndices.IncrementMinorIndex(3);
                                     }
                                     else  // none of the 3 characters match
                                     {
@@ -188,7 +204,7 @@ namespace CSharp
                                             currentIndices.SetValue((currentIndices.GetValue() & Trie3StopFlagBitMask) | currentValue);
 
                                             // we are now at the slot for the newly added character
-                                            currentIndices.IncrementMinorIndex(freeIndex + 2);
+                                            currentIndices.IncrementMinorIndex(freeIndex + 1);
                                         }
                                         else  // no free slots found; expand this 3 character trie into a 26 character trie
                                         {
@@ -200,15 +216,15 @@ namespace CSharp
                                             // get and remove the back pointer
                                             backPointers_.Remove(currentIndices.GetAddress(), out uint backAddress);
 
+                                            // add current 3 character trie to list of free tries
+                                            free3Tries_.Enqueue(currentIndices.GetAddress());
+
                                             // get a new address
                                             uint newAddress = GetNextAvailableAddress(26);
 
                                             // replace back address with the new 26 character trie address
                                             BlockMinorIndices previousIndices = new(backAddress);
                                             previousIndices.SetValue((previousIndices.GetValue() & ControlBitMask) | newAddress);
-
-                                            // skip second value
-                                            currentIndices.IncrementMinorIndex();
 
                                             // copy the 3 character trie data to the 26 character trie
                                             BlockMinorIndices copyIndices = new(newAddress);
@@ -299,7 +315,7 @@ namespace CSharp
                             }
                             else  // does not point to a trie, so point to a new 3 character trie
                             {
-                                uint newAddress = GetNextAvailableAddress(5);
+                                uint newAddress = GetNextAvailableAddress(4);
 
                                 // set previous value to point to new address
                                 currentIndices.SetValue((currentIndices.GetValue() & ControlBitMask) | newAddress);
@@ -320,16 +336,15 @@ namespace CSharp
                                 // first value is the characters stored here
                                 currentIndices.SetValue(currentCharIndex);
 
-                                // second value is pointer back to the previous address
+                                // second value is the first character slot, which we will initialize
                                 currentIndices.IncrementMinorIndex();
-                                currentIndices.SetValue(previousAddress);
+                                currentIndices.SetValue(0);
 
-                                // third value is the first character slot, which we will skip
-                                // fourth value is the second character slot, which we will initialize
-                                currentIndices.IncrementMinorIndex(2);
+                                // third value is the second character slot, which we will initialize
+                                currentIndices.IncrementMinorIndex();
                                 currentIndices.SetValue(0b01 << AddressBitCount);
 
-                                // fifth value is the third character slot, which we will initialize
+                                // fourth value is the third character slot, which we will initialize
                                 currentIndices.IncrementMinorIndex();
                                 currentIndices.SetValue(0b10 << AddressBitCount);
 
@@ -357,7 +372,7 @@ namespace CSharp
                                 number >>= AddressBitCount;
 
                                 // move back to the first value in this 3 character trie
-                                currentIndices.IncrementMinorIndex(-((int)number + 2));
+                                currentIndices.IncrementMinorIndex(-((int)number + 1));
 
                                 // get current stop bits
                                 currentValue = currentIndices.GetValue();
@@ -395,7 +410,7 @@ namespace CSharp
                     number >>= AddressBitCount;
 
                     // move back to the first value in this 3 character trie
-                    currentIndices.IncrementMinorIndex(-((int)number + 2));
+                    currentIndices.IncrementMinorIndex(-((int)number + 1));
 
                     // get current stop bits
                     currentValue = currentIndices.GetValue();
@@ -460,12 +475,6 @@ namespace CSharp
                     // match characters stored in 3 character trie
                     if (currentCharIndex == (currentValue & CharacterBitMask))
                     {
-                        currentIndices.IncrementMinorIndex(4);
-                        continue;
-                    }
-                    currentValue >>= 5;
-                    if (currentCharIndex == (currentValue & CharacterBitMask))
-                    {
                         currentIndices.IncrementMinorIndex(3);
                         continue;
                     }
@@ -473,6 +482,12 @@ namespace CSharp
                     if (currentCharIndex == (currentValue & CharacterBitMask))
                     {
                         currentIndices.IncrementMinorIndex(2);
+                        continue;
+                    }
+                    currentValue >>= 5;
+                    if (currentCharIndex == (currentValue & CharacterBitMask))
+                    {
+                        currentIndices.IncrementMinorIndex(1);
                         continue;
                     }
 
@@ -496,7 +511,7 @@ namespace CSharp
                 // back track to first value in 3 char trie
                 uint currentNumber = currentValue & Trie3CharNumberBitMask;
                 currentNumber >>= AddressBitCount;
-                currentIndices.IncrementMinorIndex(-((int)currentNumber + 2));
+                currentIndices.IncrementMinorIndex(-((int)currentNumber + 1));
                 currentValue = currentIndices.GetValue();
 
                 uint stopBits = currentValue & Trie3StopFlagBitMask;
