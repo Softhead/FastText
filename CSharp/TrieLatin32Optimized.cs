@@ -78,18 +78,7 @@ namespace CSharp
             {
                 if (free3Tries_.Count != 0)
                 {
-                    if (free3Tries_.Count > 1)
-                    {
-                        int x = 5;
-                    }
-                    uint trie = free3Tries_.Dequeue();
-
-                    if (backPointers_.ContainsValue(trie))
-                    {
-                        int x = 5;
-                    }
-
-                    return trie;
+                    return free3Tries_.Dequeue();
                 }
             }
 
@@ -524,6 +513,73 @@ namespace CSharp
             }
 
             return false;
+        }
+
+        public void Stats()
+        {
+            int[] count26 = new int[26];
+            int[] count3 = new int[3];
+            int total26 = 0;
+            int totalCount = 0;
+
+            for (uint currentAddress = 0; currentAddress < nextAvailableNode_; )
+            {
+                totalCount++;
+                BlockMinorIndices i = new(currentAddress);
+                uint value = i.GetValue();
+                bool isCurrent26Chars = (value & TrieFlagBitMask) == TrieFlagBitMask;
+
+                if (isCurrent26Chars)
+                {
+                    currentAddress += 26;
+                    total26++;
+                    int count = 0;
+                    for (int j = 0; j < 26; j++)
+                    {
+                        if ((i.GetValue() & AddressBitMask) != 0)
+                        {
+                            count++;
+                        }
+                        i.IncrementMinorIndex(j);
+                    }
+
+                    count26[count]++;
+                }
+                else
+                {
+                    currentAddress += 4;
+                    int count = 0;
+                    if ((value & CharacterBitMask) != 0b11111)
+                    {
+                        count++;
+                    }
+                    value >>= 5;
+                    if ((value & CharacterBitMask) != 0b11111)
+                    {
+                        count++;
+                    }
+                    value >>= 5;
+                    if ((value & CharacterBitMask) != 0b11111)
+                    {
+                        count++;
+                    }
+
+                    count3[count - 1]++;
+                }
+            }
+
+            for (int i = 0; i < 26; i++)
+            {
+                Console.WriteLine($"{i}: {count26[i]}");
+            }
+            for (int i = 0; i < 3; i++)
+            {
+                Console.WriteLine($"{i}: {count3[i]}");
+            }
+
+
+            Console.WriteLine($"26 char tries: {total26}");
+            Console.WriteLine($"Total: {totalCount}");
         }
     }
 }
