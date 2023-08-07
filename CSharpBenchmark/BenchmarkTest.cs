@@ -4,6 +4,8 @@ using System.Text;
 
 namespace CSharpBenchmark
 {
+    [MinIterationCount(2)]
+    [MaxIterationCount(5)]
     [MemoryDiagnoser]
     public class Benchmark
     {
@@ -64,7 +66,7 @@ namespace CSharpBenchmark
             }
         }
 
-        [Params(10, 100, 1000, 10_000, 1001)]
+        [Params(10000)]//10, 100, 1000, 10_000, 1001, 10002)]
         public int n_;
 
         [GlobalSetup]
@@ -73,6 +75,10 @@ namespace CSharpBenchmark
             if (n_ == 1001)
             {
                 data_ = File.ReadAllBytes("c:\\SoftHead\\FastText\\1000 words.txt");
+            }
+            else if (n_ == 10002)
+            {
+                data_ = File.ReadAllBytes("c:\\SoftHead\\FastText\\words_alpha.txt");
             }
             else
             {
@@ -98,6 +104,7 @@ namespace CSharpBenchmark
             ll = new(DataStream);
             ll.CompleteSort();
             tl32 = new(DataStream);
+            tl32o = new(DataStream);
 
             if (n_ < 10_000)
                 tl64o = new(DataStream);
@@ -105,11 +112,12 @@ namespace CSharpBenchmark
             tl128o = new(DataStream);
         }
 
-        HashSetLatin hsl;
-        ListLatin ll;
-        TrieLatin32 tl32;
-        TrieLatin64Optimized tl64o;
-        TrieLatin128Optimized tl128o;
+        public HashSetLatin hsl;
+        public ListLatin ll;
+        public TrieLatin32 tl32;
+        public TrieLatin32Optimized tl32o;
+        public TrieLatin64Optimized tl64o;
+        public TrieLatin128Optimized tl128o;
 
 
         [Benchmark]
@@ -154,6 +162,18 @@ namespace CSharpBenchmark
             foreach (string word in LookupDataWords)
             {
                 if (!tl32.IsValidWord(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
+
+        [Benchmark]
+        public void LookupTrieLatin32Optimized()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!tl32o.IsValidWord(word))
                 {
                     throw new Exception();
                 }

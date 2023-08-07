@@ -1,17 +1,19 @@
-﻿namespace CSharp
+﻿using System.Globalization;
+
+namespace CSharp
 {
     // A trie with 32 bit nodes.
     //
     // Each node contains:
     // MSB: 1 indicates that this is a valid stop point.
-    // Lower 3 bits: the index of the next node in the trie.
+    // Lower 31 bits: the index of the next node in the trie.
 
     // New characters are added to the trie as a simple allocation of an additional 26 nodes.
     public class TrieLatin32
     {
         // allocate in blocks of 1024 so that we don't need to allocate memory each time a letter is added
         private const int BlockSize = 1024;
-        private readonly int BitsToShiftForBlockSize = (int)Math.Log2(BlockSize);
+        private readonly int BitsToShiftForBlockSize =  (int)Math.Log2(BlockSize);
         private const int BlockMinorIndexBitMask = BlockSize - 1;
         private const uint StopFlagBitMask = 0x8000_0000;
         private const uint AddressBitMask = 0x7fff_ffff;
@@ -29,7 +31,11 @@
             nextAvailableNode_ = 26;
 
             parseComplete_ = new Barrier(2);
-            Task.Run(async () => { await ParseStream(s); });
+            _ = Task.Run(async () => { await ParseStream(s).ConfigureAwait(false); })
+                .ContinueWith((t) =>
+                {
+                    if (t.IsFaulted && t.Exception is not null) throw t.Exception;
+                });
             parseComplete_.SignalAndWait();
         }
 
@@ -57,7 +63,7 @@
 
             while (bytesRead != 0)
             {
-                bytesRead = await s.ReadAsync(buffer);
+                bytesRead = await s.ReadAsync(buffer).ConfigureAwait(false);
 
                 for (int i = 0; i < bytesRead; i++)
                 {
@@ -66,7 +72,7 @@
                     // sequences of letters are treated as a word, and all other characters are considered whitespace
                     if (char.IsLetter(currentChar))
                     {
-                        currentChar = char.ToLower(currentChar);
+                        currentChar = char.ToLower(currentChar, CultureInfo.InvariantCulture);
 
                         if (!isCurrentlyInWord)  // start a new word
                         {
@@ -172,6 +178,53 @@
             }
 
             return false;
+        }
+
+        public void Stats()
+        {
+            int[] count = new int[26];
+            int blockIndex;
+            int minorIndex;
+            UInt128 currentValue;
+            int letterCount;
+            Dictionary<int, int> usage = new();
+
+            for (uint currentAddress = 1; currentAddress < nextAvailableNode_; currentAddress += 26)
+            {
+                letterCount = 0;
+                for (int i = 0; i < 26; i++)
+                {
+                    blockIndex = (int)((currentAddress + i) >> BitsToShiftForBlockSize);
+                    minorIndex = (int)((currentAddress + i) & BlockMinorIndexBitMask);
+                    currentValue = blocks_[blockIndex][minorIndex];
+                    if ((currentValue & AddressBitMask) == 0)
+                    {
+                        count[i]++;
+                        letterCount++;
+                    }
+                }
+                if (usage.ContainsKey(letterCount))
+                {
+                    usage[letterCount]++;
+                }
+                else
+                {
+                    usage.Add(letterCount, 1);
+                }
+            }
+
+            for (int i = 0; i < 26; i++)
+            {
+                Console.WriteLine($"{(char)(i + 'a')}: {count[i]}");
+            }
+
+            int totalCount = 0;
+            foreach (int i in usage.Keys.Order())
+            {
+                Console.WriteLine($"{i}: {usage[i]}");
+                totalCount += usage[i];
+            }
+            Console.WriteLine($"Total: {totalCount}");
         }
     }
 }

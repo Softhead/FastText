@@ -9,15 +9,9 @@ namespace CSharpBenchmark
         static void Main(string[] args)
         {
             //Benchmark b = new();
-            //b.n_ = 10;
+            //b.n_ = 1000;
             //b.Setup();
-            //b.LookupTrieLatin128Optimized();
-
-            //string data = "b mtuesgm c";
-            //MemoryStream ms = new(Encoding.UTF8.GetBytes(data));
-            //TrieLatin64Optimized tl64o = new(ms);
-            //tl64o.IsValidWord("a");
-            //tl64o.IsValidWord("mtuesgm");
+            //b.LookupTrieLatin32Optimized();
 
             BenchmarkRunner.Run<Benchmark>();
         }
