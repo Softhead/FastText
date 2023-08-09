@@ -1,4 +1,6 @@
-﻿namespace CSharp
+﻿using System.Runtime.CompilerServices;
+
+namespace CSharp
 {
     internal class BlockMinorIndices
     {
@@ -26,6 +28,7 @@
         {
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void IncrementMinorIndex(int increment = 1)
         {
             minorIndex_ += increment;
@@ -41,6 +44,7 @@
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void SetAddress(uint currentAddress)
         {
             blockIndex_ = (int)(currentAddress >> BitsToShiftForBlockSize);
@@ -52,6 +56,7 @@
             return (uint) (blockIndex_ * blockSize_ + minorIndex_);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public uint GetValue()
         {
             return blocks_[blockIndex_][minorIndex_];

@@ -45,7 +45,8 @@ namespace CSharp
         private uint nextAvailableNode_ = 0;
         private uint maximumAvailableNode_ = 0;
         private readonly List<uint[]> blocks_ = new();
-        private readonly Dictionary<uint, uint> backPointers_ = new();
+        private readonly Dictionary<uint, uint> backPointersKeyBlockAddress_ = new();
+        private readonly Dictionary<uint, uint> backPointersKeyDestinationAddress_ = new();
         private readonly Queue<uint> free3Tries_ = new();
         private readonly Barrier parseComplete_;
 
@@ -203,7 +204,8 @@ namespace CSharp
                                             stopBits >>= Trie3StopBitShiftCount;
 
                                             // get and remove the back pointer
-                                            backPointers_.Remove(currentIndices.GetAddress(), out uint backAddress);
+                                            backPointersKeyBlockAddress_.Remove(currentIndices.GetAddress(), out uint backAddress);
+                                            backPointersKeyDestinationAddress_.Remove(backAddress);
 
                                             // add current 3 character trie to list of free tries
                                             free3Tries_.Enqueue(currentIndices.GetAddress());
@@ -230,10 +232,12 @@ namespace CSharp
 
                                             // find if there is a back pointer to this 3 character trie slot
                                             currentAddress = currentIndices.GetAddress();
-                                            if (backPointers_.ContainsValue(currentAddress))
+                                            if (backPointersKeyDestinationAddress_.TryGetValue(currentAddress, out uint blockAddress))
                                             {
-                                                uint key = backPointers_.Single(o => o.Value == currentAddress).Key;
-                                                backPointers_[key] = copyIndices.GetAddress();
+                                                uint copyAddress = copyIndices.GetAddress();
+                                                backPointersKeyBlockAddress_[blockAddress] = copyAddress;
+                                                backPointersKeyDestinationAddress_.Remove(currentAddress);
+                                                backPointersKeyDestinationAddress_.Add(copyAddress, blockAddress);
                                             }
 
                                             // move back to base of 26 character trie
@@ -251,10 +255,12 @@ namespace CSharp
 
                                             // find if there is a back pointer to this 3 character trie slot
                                             currentAddress = currentIndices.GetAddress();
-                                            if (backPointers_.ContainsValue(currentAddress))
+                                            if (backPointersKeyDestinationAddress_.TryGetValue(currentAddress, out blockAddress))
                                             {
-                                                uint key = backPointers_.Single(o => o.Value == currentAddress).Key;
-                                                backPointers_[key] = copyIndices.GetAddress();
+                                                uint copyAddress = copyIndices.GetAddress();
+                                                backPointersKeyBlockAddress_[blockAddress] = copyAddress;
+                                                backPointersKeyDestinationAddress_.Remove(currentAddress);
+                                                backPointersKeyDestinationAddress_.Add(copyAddress, blockAddress);
                                             }
 
                                             // move back to base of 26 character trie
@@ -272,10 +278,12 @@ namespace CSharp
 
                                             // find if there is a back pointer to this 3 character trie slot
                                             currentAddress = currentIndices.GetAddress();
-                                            if (backPointers_.ContainsValue(currentAddress))
+                                            if (backPointersKeyDestinationAddress_.TryGetValue(currentAddress, out blockAddress))
                                             {
-                                                uint key = backPointers_.Single(o => o.Value == currentAddress).Key;
-                                                backPointers_[key] = copyIndices.GetAddress();
+                                                uint copyAddress = copyIndices.GetAddress();
+                                                backPointersKeyBlockAddress_[blockAddress] = copyAddress;
+                                                backPointersKeyDestinationAddress_.Remove(currentAddress);
+                                                backPointersKeyDestinationAddress_.Add(copyAddress, blockAddress);
                                             }
 
                                             // move back to base of 26 character trie
@@ -317,7 +325,8 @@ namespace CSharp
 
                                 // remember previous address
                                 previousAddress = currentIndices.GetAddress();
-                                backPointers_.Add(newAddress, previousAddress);
+                                backPointersKeyBlockAddress_.Add(newAddress, previousAddress);
+                                backPointersKeyDestinationAddress_.Add(previousAddress, newAddress);
 
                                 // move to new address
                                 currentIndices.SetAddress(newAddress);
@@ -417,6 +426,14 @@ namespace CSharp
             parseComplete_.SignalAndWait();
         }
 
+        public void Cleanup()
+        {
+            backPointersKeyBlockAddress_.Clear();
+            backPointersKeyDestinationAddress_.Clear();
+        }
+
+        readonly BlockMinorIndices lookupIndices_ = new();
+
         public bool IsValidWord(ReadOnlySpan<char> word)
         {
             if (word.Length == 0 || !char.IsLetter(word[0]))
@@ -428,12 +445,13 @@ namespace CSharp
             uint currentAddress;
             uint currentValue;
             bool isCurrent26Chars;
-            BlockMinorIndices currentIndices = new((uint)(char.ToLower(word[0], CultureInfo.InvariantCulture) - 'a'));
+            char currentChar;
+            lookupIndices_.SetAddress((uint)(char.ToLower(word[0], CultureInfo.InvariantCulture) - 'a'));
 
             // parse through each subsequent character
             for (int i = 1; i < word.Length; i++)
             {
-                char currentChar = word[i];
+                currentChar = word[i];
 
                 // if the character is not a letter, then the word is not in the trie
                 if (!char.IsLetter(currentChar))
@@ -442,41 +460,41 @@ namespace CSharp
                 }
 
                 // if there's no address entry at the address of the previous character, then the word is not in the trie
-                currentValue = currentIndices.GetValue();
+                currentValue = lookupIndices_.GetValue();
                 currentAddress = currentValue & AddressBitMask;
                 if (currentAddress == 0)
                 {
                     return false;
                 }
 
-                currentIndices.SetAddress(currentAddress);
-                currentValue = currentIndices.GetValue();
+                lookupIndices_.SetAddress(currentAddress);
+                currentValue = lookupIndices_.GetValue();
                 isCurrent26Chars = (currentValue & TrieFlagBitMask) == TrieFlagBitMask;
                 uint currentCharIndex = (uint)(char.ToLower(currentChar, CultureInfo.InvariantCulture) - 'a');
 
                 if (isCurrent26Chars)
                 {
                     // find character in 26 character trie
-                    currentIndices.IncrementMinorIndex((int)currentCharIndex);
+                    lookupIndices_.IncrementMinorIndex((int)currentCharIndex);
                 }
                 else
                 {
                     // match characters stored in 3 character trie
                     if (currentCharIndex == (currentValue & CharacterBitMask))
                     {
-                        currentIndices.IncrementMinorIndex(3);
+                        lookupIndices_.IncrementMinorIndex(3);
                         continue;
                     }
                     currentValue >>= 5;
                     if (currentCharIndex == (currentValue & CharacterBitMask))
                     {
-                        currentIndices.IncrementMinorIndex(2);
+                        lookupIndices_.IncrementMinorIndex(2);
                         continue;
                     }
                     currentValue >>= 5;
                     if (currentCharIndex == (currentValue & CharacterBitMask))
                     {
-                        currentIndices.IncrementMinorIndex(1);
+                        lookupIndices_.IncrementMinorIndex(1);
                         continue;
                     }
 
@@ -484,7 +502,7 @@ namespace CSharp
                 }
             }
 
-            currentValue = currentIndices.GetValue();
+            currentValue = lookupIndices_.GetValue();
             isCurrent26Chars = (currentValue & TrieFlagBitMask) == TrieFlagBitMask;
 
             // if the node is marked as a valid ending point for a word, then the word is in the trie
@@ -500,8 +518,8 @@ namespace CSharp
                 // back track to first value in 3 char trie
                 uint currentNumber = currentValue & Trie3CharNumberBitMask;
                 currentNumber >>= AddressBitCount;
-                currentIndices.IncrementMinorIndex(-((int)currentNumber + 1));
-                currentValue = currentIndices.GetValue();
+                lookupIndices_.IncrementMinorIndex(-((int)currentNumber + 1));
+                currentValue = lookupIndices_.GetValue();
 
                 uint stopBits = currentValue & Trie3StopFlagBitMask;
                 stopBits >>= Trie3StopBitShiftCount;
