@@ -42,7 +42,7 @@ namespace CSharp
         private const int AddressBitCount = 29;
         private const int Trie3StopBitShiftCount = 26;
         private const uint CharacterBitMask = 0b11111;
-        private uint nextAvailableNode_ = 0;
+        private uint nextAvailableAddress_ = 0;
         private uint maximumAvailableNode_ = 0;
         private readonly List<uint[]> blocks_ = new();
         private readonly Dictionary<uint, uint> backPointersKeyBlockAddress_ = new();
@@ -61,7 +61,7 @@ namespace CSharp
             {
                 blocks_[0][i] = TrieFlagBitMask;
             }
-            nextAvailableNode_ = 26;
+            nextAvailableAddress_ = 26;
 
             parseComplete_ = new Barrier(2);
             _ = Task.Run(async () => { await ParseStream(s).ConfigureAwait(false); })
@@ -83,10 +83,10 @@ namespace CSharp
                 }
             }
 
-            uint result = nextAvailableNode_;
+            uint result = nextAvailableAddress_;
 
-            nextAvailableNode_ += count;
-            if (nextAvailableNode_ >= maximumAvailableNode_)
+            nextAvailableAddress_ += count;
+            if (nextAvailableAddress_ >= maximumAvailableNode_)
             {
                 maximumAvailableNode_ += BlockSize;
                 blocks_.Add(new uint[BlockSize]);
@@ -542,6 +542,129 @@ namespace CSharp
             return false;
         }
 
+        uint[] storage_;
+
+        public void SetupStorage()
+        {
+            storage_ = new uint[nextAvailableAddress_];
+            BlockMinorIndices ind = new(0);
+            for (int i = 0; i < nextAvailableAddress_; i++)
+            {
+                storage_[i] = ind.GetValue();
+                ind.IncrementMinorIndex();
+            }
+        }
+
+        public bool IsValidWordOptimized(ReadOnlySpan<char> word)
+        {
+            int length = word.Length;
+            uint currentCharIndex = word[0];
+            currentCharIndex |= 0x20;  // convert to upper case
+
+            if (length == 0 || currentCharIndex < 'a' || currentCharIndex > 'z')
+            {
+                return false;
+            }
+
+            uint currentAddress;
+            uint currentValue;
+            bool isCurrent26Chars;
+            uint currentNumber;
+            uint stopBits;
+            uint compareBits;
+            uint currentIndex;
+
+            // get address for first char
+            currentCharIndex -= 'a';
+            currentIndex = currentCharIndex;
+
+            // parse through each subsequent character
+            for (int i = 1; i < length; i++)
+            {
+                currentCharIndex = word[i];
+                currentCharIndex |= 0x20;  // convert to upper case
+
+                // if the character is not a letter, then the word is not in the trie
+                if (currentCharIndex < 'a' || currentCharIndex > 'z')
+                {
+                    return false;
+                }
+
+                // convert to a-based index
+                currentCharIndex -= 'a';
+
+                // if there's no address entry at the address of the previous character, then the word is not in the trie
+                currentAddress = storage_[currentIndex] & AddressBitMask;
+                if (currentAddress == 0)
+                {
+                    return false;
+                }
+
+                currentIndex = currentAddress;
+                currentValue = storage_[currentIndex];
+                isCurrent26Chars = (currentValue & TrieFlagBitMask) == TrieFlagBitMask;
+
+                if (isCurrent26Chars)
+                {
+                    // find character in 26 character trie
+                    currentIndex += currentCharIndex;
+                }
+                else
+                {
+                    // match characters stored in 3 character trie
+                    if (currentCharIndex == (currentValue & CharacterBitMask))
+                    {
+                        currentIndex += 3;
+                        continue;
+                    }
+                    currentValue >>= 5;
+                    if (currentCharIndex == (currentValue & CharacterBitMask))
+                    {
+                        currentIndex += 2;
+                        continue;
+                    }
+                    currentValue >>= 5;
+                    if (currentCharIndex == (currentValue & CharacterBitMask))
+                    {
+                        currentIndex++;
+                        continue;
+                    }
+
+                    return false;
+                }
+            }
+
+            currentValue = storage_[currentIndex];
+            isCurrent26Chars = (currentValue & TrieFlagBitMask) == TrieFlagBitMask;
+
+            // if the node is marked as a valid ending point for a word, then the word is in the trie
+            if (isCurrent26Chars)
+            {
+                if ((currentValue & Trie26StopFlagBitMask) != 0)
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                // back track to first value in 3 char trie
+                currentNumber = currentValue & Trie3CharNumberBitMask;
+                currentNumber >>= AddressBitCount;
+                currentIndex -= currentNumber + 1;
+                currentValue = storage_[currentIndex];
+
+                stopBits = currentValue & Trie3StopFlagBitMask;
+                stopBits >>= Trie3StopBitShiftCount;
+                compareBits = (uint)0b100 >> (int)currentNumber;
+                if ((stopBits & compareBits) != 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         public void Stats()
         {
             int[] count26 = new int[26];
@@ -549,7 +672,7 @@ namespace CSharp
             int total26 = 0;
             int totalCount = 0;
 
-            for (uint currentAddress = 0; currentAddress < nextAvailableNode_; )
+            for (uint currentAddress = 0; currentAddress < nextAvailableAddress_; )
             {
                 totalCount++;
                 BlockMinorIndices i = new(currentAddress);
