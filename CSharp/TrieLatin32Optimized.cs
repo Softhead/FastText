@@ -52,7 +52,7 @@ namespace CSharp
 
         public TrieLatin32Optimized(Stream s)
         {
-            BlockMinorIndices.Initialize(blocks_, BlockSize);
+            BlockMinorIndices.Initialize(blocks_, BlockSize, AddressBitMask);
             blocks_.Add(new uint[BlockSize]);
             maximumAvailableNode_ = BlockSize;
 
@@ -144,7 +144,7 @@ namespace CSharp
                                 if (isCurrent26CharTrie)
                                 {
                                     // lookup current character in 26 character trie
-                                    currentIndices.IncrementMinorIndex((int)currentCharIndex);
+                                    currentIndices.IncrementMinorIndex(currentCharIndex);
                                 }
                                 else
                                 {
@@ -172,7 +172,7 @@ namespace CSharp
                                     else  // none of the 3 characters match
                                     {
                                         // find a free character slot
-                                        int freeIndex = -1;
+                                        uint freeIndex = 0;
                                         if (currentNodeCharIndex[1] == 0b11111)
                                         {
                                             freeIndex = 1;
@@ -182,7 +182,7 @@ namespace CSharp
                                             freeIndex = 2;
                                         }
 
-                                        if (freeIndex != -1)
+                                        if (freeIndex != 0)
                                         {
                                             // fill in this slot with the current character
                                             currentNodeCharIndex[freeIndex] = currentCharIndex;
@@ -221,7 +221,7 @@ namespace CSharp
                                             BlockMinorIndices copyIndices = new(newAddress);
 
                                             // move to slot in 26 character trie
-                                            copyIndices.IncrementMinorIndex((int)currentNodeCharIndex[0]);
+                                            copyIndices.IncrementMinorIndex(currentNodeCharIndex[0]);
                                             currentIndices.IncrementMinorIndex();
                                             currentValue = currentIndices.GetValue() & AddressBitMask;
                                             if ((stopBits & 0b100) != 0)
@@ -241,10 +241,10 @@ namespace CSharp
                                             }
 
                                             // move back to base of 26 character trie
-                                            copyIndices.IncrementMinorIndex(-(int)currentNodeCharIndex[0]);
+                                            copyIndices.DecrementMinorIndex(currentNodeCharIndex[0]);
 
                                             // move to slot in 26 character trie
-                                            copyIndices.IncrementMinorIndex((int)currentNodeCharIndex[1]);
+                                            copyIndices.IncrementMinorIndex(currentNodeCharIndex[1]);
                                             currentIndices.IncrementMinorIndex();
                                             currentValue = currentIndices.GetValue() & AddressBitMask;
                                             if ((stopBits & 0b10) != 0)
@@ -264,10 +264,10 @@ namespace CSharp
                                             }
 
                                             // move back to base of 26 character trie
-                                            copyIndices.IncrementMinorIndex(-(int)currentNodeCharIndex[1]);
+                                            copyIndices.DecrementMinorIndex(currentNodeCharIndex[1]);
 
                                             // move to slot in 26 character trie
-                                            copyIndices.IncrementMinorIndex((int)currentNodeCharIndex[2]);
+                                            copyIndices.IncrementMinorIndex(currentNodeCharIndex[2]);
                                             currentIndices.IncrementMinorIndex();
                                             currentValue = currentIndices.GetValue() & AddressBitMask;
                                             if ((stopBits & 0b1) != 0)
@@ -287,7 +287,7 @@ namespace CSharp
                                             }
 
                                             // move back to base of 26 character trie
-                                            copyIndices.IncrementMinorIndex(-(int)currentNodeCharIndex[2]);
+                                            copyIndices.DecrementMinorIndex(currentNodeCharIndex[2]);
 
                                             // set MSB in each address of 26 character trie
                                             // reserve next 25 addresses for use in this 26 character trie
@@ -347,7 +347,7 @@ namespace CSharp
                                 currentIndices.SetValue(0b10 << AddressBitCount);
 
                                 // current address is now the first character slot
-                                currentIndices.IncrementMinorIndex(-2);
+                                currentIndices.DecrementMinorIndex(2);
                             }
                         }
                     }
@@ -370,7 +370,7 @@ namespace CSharp
                                 number >>= AddressBitCount;
 
                                 // move back to the first value in this 3 character trie
-                                currentIndices.IncrementMinorIndex(-((int)number + 1));
+                                currentIndices.DecrementMinorIndex(number + 1);
 
                                 // get current stop bits
                                 currentValue = currentIndices.GetValue();
@@ -408,7 +408,7 @@ namespace CSharp
                     number >>= AddressBitCount;
 
                     // move back to the first value in this 3 character trie
-                    currentIndices.IncrementMinorIndex(-((int)number + 1));
+                    currentIndices.DecrementMinorIndex(number + 1);
 
                     // get current stop bits
                     currentValue = currentIndices.GetValue();
@@ -432,50 +432,59 @@ namespace CSharp
             backPointersKeyDestinationAddress_.Clear();
         }
 
-        readonly BlockMinorIndices lookupIndices_ = new();
+        private readonly BlockMinorIndices lookupIndices_ = new();
 
         public bool IsValidWord(ReadOnlySpan<char> word)
         {
-            if (word.Length == 0 || !char.IsLetter(word[0]))
+            int length = word.Length;
+            uint currentCharIndex = word[0];
+            currentCharIndex |= 0x20;  // convert to upper case
+
+            if (length == 0 || currentCharIndex < 'a' || currentCharIndex > 'z')
             {
                 return false;
             }
 
-            // get address for first char
             uint currentAddress;
             uint currentValue;
             bool isCurrent26Chars;
-            char currentChar;
-            lookupIndices_.SetAddress((uint)(char.ToLower(word[0], CultureInfo.InvariantCulture) - 'a'));
+            uint currentNumber;
+            uint stopBits;
+            uint compareBits;
+
+            // get address for first char
+            currentCharIndex -= 'a';
+            lookupIndices_.SetAddress(currentCharIndex);
 
             // parse through each subsequent character
-            for (int i = 1; i < word.Length; i++)
+            for (int i = 1; i < length; i++)
             {
-                currentChar = word[i];
+                currentCharIndex = word[i];
+                currentCharIndex |= 0x20;  // convert to upper case
 
                 // if the character is not a letter, then the word is not in the trie
-                if (!char.IsLetter(currentChar))
+                if (currentCharIndex < 'a' || currentCharIndex > 'z')
                 {
                     return false;
                 }
 
+                // convert to a-based index
+                currentCharIndex -= 'a';
+
                 // if there's no address entry at the address of the previous character, then the word is not in the trie
-                currentValue = lookupIndices_.GetValue();
-                currentAddress = currentValue & AddressBitMask;
+                currentAddress = lookupIndices_.GetValueAsAddress();
                 if (currentAddress == 0)
                 {
                     return false;
                 }
 
-                lookupIndices_.SetAddress(currentAddress);
-                currentValue = lookupIndices_.GetValue();
+                currentValue = lookupIndices_.SetAddressAndGetValue(currentAddress);
                 isCurrent26Chars = (currentValue & TrieFlagBitMask) == TrieFlagBitMask;
-                uint currentCharIndex = (uint)(char.ToLower(currentChar, CultureInfo.InvariantCulture) - 'a');
 
                 if (isCurrent26Chars)
                 {
                     // find character in 26 character trie
-                    lookupIndices_.IncrementMinorIndex((int)currentCharIndex);
+                    lookupIndices_.IncrementMinorIndex(currentCharIndex);
                 }
                 else
                 {
@@ -516,14 +525,14 @@ namespace CSharp
             else
             {
                 // back track to first value in 3 char trie
-                uint currentNumber = currentValue & Trie3CharNumberBitMask;
+                currentNumber = currentValue & Trie3CharNumberBitMask;
                 currentNumber >>= AddressBitCount;
-                lookupIndices_.IncrementMinorIndex(-((int)currentNumber + 1));
+                lookupIndices_.DecrementMinorIndex(currentNumber + 1);
                 currentValue = lookupIndices_.GetValue();
 
-                uint stopBits = currentValue & Trie3StopFlagBitMask;
+                stopBits = currentValue & Trie3StopFlagBitMask;
                 stopBits >>= Trie3StopBitShiftCount;
-                uint compareBits = (uint)0b100 >> (int)currentNumber;
+                compareBits = (uint)0b100 >> (int)currentNumber;
                 if ((stopBits & compareBits) != 0)
                 {
                     return true;
@@ -552,7 +561,7 @@ namespace CSharp
                     currentAddress += 26;
                     total26++;
                     int count = 0;
-                    for (int j = 0; j < 26; j++)
+                    for (uint j = 0; j < 26; j++)
                     {
                         if ((i.GetValue() & AddressBitMask) != 0)
                         {

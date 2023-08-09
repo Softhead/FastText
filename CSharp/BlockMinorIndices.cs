@@ -8,15 +8,17 @@ namespace CSharp
         private static int blockSize_;
         private static int BitsToShiftForBlockSize;
         private static int BlockMinorIndexBitMask;
+        private static uint AddressBitMask;
         private int blockIndex_;
         private int minorIndex_;
 
-        public static void Initialize(List<uint[]> blocks, int blockSize)
+        public static void Initialize(List<uint[]> blocks, int blockSize, uint addressBitMask)
         {
             blocks_ = blocks;
             blockSize_ = blockSize;
             BitsToShiftForBlockSize = (int)Math.Log2(blockSize);
             BlockMinorIndexBitMask = blockSize - 1;
+            AddressBitMask = addressBitMask;
         }
 
         public BlockMinorIndices(uint address)
@@ -29,15 +31,21 @@ namespace CSharp
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void IncrementMinorIndex(int increment = 1)
+        public void IncrementMinorIndex(uint increment = 1)
         {
-            minorIndex_ += increment;
-            if (increment > 0 && minorIndex_ >= blockSize_)
+            minorIndex_ += (int)increment;
+            if (minorIndex_ >= blockSize_)
             {
                 blockIndex_++;
                 minorIndex_ -= blockSize_;
             }
-            else if (increment < 0 && minorIndex_ < 0)
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public void DecrementMinorIndex(uint decrement = 1)
+        {
+            minorIndex_ -= (int)decrement;
+            if (minorIndex_ < 0)
             {
                 blockIndex_--;
                 minorIndex_ += blockSize_;
@@ -51,6 +59,14 @@ namespace CSharp
             minorIndex_ = (int)(currentAddress & BlockMinorIndexBitMask);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint SetAddressAndGetValue(uint currentAddress)
+        {
+            blockIndex_ = (int)(currentAddress >> BitsToShiftForBlockSize);
+            minorIndex_ = (int)(currentAddress & BlockMinorIndexBitMask);
+            return blocks_[blockIndex_][minorIndex_];
+        }
+
         public uint GetAddress()
         {
             return (uint) (blockIndex_ * blockSize_ + minorIndex_);
@@ -60,6 +76,12 @@ namespace CSharp
         public uint GetValue()
         {
             return blocks_[blockIndex_][minorIndex_];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public uint GetValueAsAddress()
+        {
+            return blocks_[blockIndex_][minorIndex_] & AddressBitMask;
         }
 
         public void SetValue(uint value)
