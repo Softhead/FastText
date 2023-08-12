@@ -4,8 +4,6 @@ using System.Text;
 
 namespace CSharpBenchmark
 {
-    //[MinIterationCount(2)]
-    //[MaxIterationCount(5)]
     [MemoryDiagnoser]
     public class Benchmark
     {
@@ -72,7 +70,7 @@ namespace CSharpBenchmark
             }
         }
 
-        [Params(370105)]//10, 100, 1000, 10_000, 1001, 10002)]
+        [Params(370105)]//10, 100, 1000, 10_000, 1001, 370105)]
         public int n_;
 
         [GlobalSetup]
@@ -107,27 +105,27 @@ namespace CSharpBenchmark
 
 
             hsl = new(DataStream);
-            //ll = new(DataStream);
-            //ll.CompleteSort();
-            //tl32 = new(DataStream);
+            ll = new(DataStream);
+            ll.CompleteSort();
+            tl32 = new(DataStream);
             tl32o = new(DataStream);
             tl32o.Cleanup();
             tl32o.SetupStorage();
 
-            //if (n_ < 10_000)
-            //    tl64o = new(DataStream);
+            if (n_ < 10_000)
+                tl64o = new(DataStream);
 
-            //tl128o = new(DataStream);
+            tl128o = new(DataStream);
 
             _ = LookupDataWords;
         }
 
         public HashSetLatin hsl;
-        //public ListLatin ll;
-        //public TrieLatin32 tl32;
+        public ListLatin ll;
+        public TrieLatin32 tl32;
         public TrieLatin32Optimized tl32o;
-        //public TrieLatin64Optimized tl64o;
-        //public TrieLatin128Optimized tl128o;
+        public TrieLatin64Optimized tl64o;
+        public TrieLatin128Optimized tl128o;
 
 
         [Benchmark]
@@ -142,41 +140,41 @@ namespace CSharpBenchmark
             }
         }
 
-        //[Benchmark]
-        //public void LookupListLatin()
-        //{
-        //    foreach (string word in LookupDataWords)
-        //    {
-        //        if (!ll.IsValidWord(word))
-        //        {
-        //            throw new Exception();
-        //        }
-        //    }
-        //}
+        [Benchmark]
+        public void LookupListLatin()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!ll.IsValidWord(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
 
-        //[Benchmark]
-        //public void LookupListLatinSorted()
-        //{
-        //    foreach (string word in LookupDataWords)
-        //    {
-        //        if (!ll.IsValidWordSorted(word))
-        //        {
-        //            throw new Exception();
-        //        }
-        //    }
-        //}
+        [Benchmark]
+        public void LookupListLatinSorted()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!ll.IsValidWordSorted(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
 
-        //[Benchmark]
-        //public void LookupTrieLatin32()
-        //{
-        //    foreach (string word in LookupDataWords)
-        //    {
-        //        if (!tl32.IsValidWord(word))
-        //        {
-        //            throw new Exception();
-        //        }
-        //    }
-        //}
+        [Benchmark]
+        public void LookupTrieLatin32()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!tl32.IsValidWord(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
 
         [Benchmark]
         public void LookupTrieLatin32Optimized()
@@ -190,29 +188,29 @@ namespace CSharpBenchmark
             }
         }
 
-        //[Benchmark]
-        //public void LookupTrieLatin64Optimized()
-        //{
-        //    if (n_ < 10_000)
-        //        foreach (string word in LookupDataWords)
-        //        {
-        //            if (!tl64o.IsValidWord(word))
-        //            {
-        //                throw new Exception();
-        //            }
-        //        }
-        //}
+        [Benchmark]
+        public void LookupTrieLatin64Optimized()
+        {
+            if (n_ < 10_000)
+                foreach (string word in LookupDataWords)
+                {
+                    if (!tl64o.IsValidWord(word))
+                    {
+                        throw new Exception();
+                    }
+                }
+        }
 
-        //[Benchmark]
-        //public void LookupTrieLatin128Optimized()
-        //{
-        //    foreach (string word in LookupDataWords)
-        //    {
-        //        if (!tl128o.IsValidWord(word))
-        //        {
-        //            throw new Exception();
-        //        }
-        //    }
-        //}
+        [Benchmark]
+        public void LookupTrieLatin128Optimized()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!tl128o.IsValidWord(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
     }
 }
