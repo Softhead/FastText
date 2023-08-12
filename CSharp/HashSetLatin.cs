@@ -12,13 +12,13 @@ namespace CSharp
 
         public HashSetLatin(Stream s)
         {
-            words_ = new HashSet<string>();
+            words_ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             ParseComplete_ = new Barrier(2);
-            Task.Run(async () => { await ParseStream(s); })
+            _ = Task.Run(async () => { await ParseStream(s).ConfigureAwait(false); })
                 .ContinueWith((t) =>
                 {
-                    if (t.IsFaulted) throw t.Exception;
+                    if (t.IsFaulted && t.Exception is not null) throw t.Exception;
                 });
             ParseComplete_.SignalAndWait();
         }
@@ -34,7 +34,7 @@ namespace CSharp
 
             while (bytesRead != 0)
             {
-                bytesRead = await s.ReadAsync(buffer);
+                bytesRead = await s.ReadAsync(buffer).ConfigureAwait(false);
                 for (int i = 0; i < bytesRead; i++)
                 {
                     currentChar = (char)buffer.Span[i];
@@ -47,7 +47,7 @@ namespace CSharp
                             // check for end of buffer
                             if (i == bytesRead - 1)
                             {
-                                previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray()).ToLower();
+                                previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray());
                                 currentStart = bytesRead;
                                 isCurrentlyInWord = false;
                             }
@@ -64,7 +64,7 @@ namespace CSharp
                         // end the current word
                         if (isCurrentlyInWord)
                         {
-                            string word = Encoding.UTF8.GetString(buffer[currentStart..i].ToArray()).ToLower();
+                            string word = Encoding.UTF8.GetString(buffer[currentStart..i].ToArray());
 
                             if (previousWord is not null)
                             {
@@ -91,7 +91,7 @@ namespace CSharp
 
                 if (isCurrentlyInWord)
                 {
-                    previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray()).ToLower();
+                    previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray());
                     currentStart = 0;
                 }
             }
@@ -104,14 +104,14 @@ namespace CSharp
             ParseComplete_.SignalAndWait();
         }
 
-        public bool IsValidWord(ReadOnlySpan<char> word)
+        public bool IsValidWord(string word)
         {
             if (word.Length == 0 || !char.IsLetter(word[0]))
             {
                 return false;
             }
 
-            return words_.Contains(word.ToString().ToLower());
+            return words_.Contains(word);
         }
     }
 }
