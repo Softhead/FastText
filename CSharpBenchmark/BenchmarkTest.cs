@@ -70,7 +70,7 @@ namespace CSharpBenchmark
             }
         }
 
-        [Params(370105)]//10, 100, 1000, 10_000, 1001, 370105)]
+        [Params(10000)]//10, 100, 1000, 10_000, 1001, 370105)]
         public int n_;
 
         [GlobalSetup]
@@ -106,7 +106,7 @@ namespace CSharpBenchmark
 
             hsl = new(DataStream);
             ll = new(DataStream);
-            ll.CompleteSort();
+            ll.Complete();
             tl32 = new(DataStream);
             tl32o = new(DataStream);
             tl32o.Cleanup();
@@ -158,6 +158,42 @@ namespace CSharpBenchmark
             foreach (string word in LookupDataWords)
             {
                 if (!ll.IsValidWordSorted(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
+
+        [Benchmark]
+        public void LookupListLatinArray()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!ll.IsValidWordArray(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
+
+        [Benchmark]
+        public void LookupListLatinSearch()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!ll.IsValidWordSearch(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
+
+        [Benchmark]
+        public void LookupListLatinExists()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!ll.IsValidWordExists(word))
                 {
                     throw new Exception();
                 }

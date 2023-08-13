@@ -132,7 +132,7 @@ namespace CSharp
             ParseComplete_.SignalAndWait();
         }
 
-        public bool IsValidWord(ReadOnlySpan<char> word)
+        public bool IsValidWord(string word)
         {
             if (word.Length == 0 || !char.IsLetter(word[0]))
             {
@@ -144,24 +144,79 @@ namespace CSharp
                 return false;
             }
 
-            List<string> list = words_[word.Length];
-            return list.Contains(word.ToString().ToLower());
+            return words_[word.Length].Contains(word, StringComparer.OrdinalIgnoreCase);
         }
 
-        public void CompleteSort()
+        public bool IsValidWordExists(string word)
         {
-            if (!hasSorted_)
+            if (word.Length == 0 || !char.IsLetter(word[0]))
             {
-                hasSorted_ = true;
-                for (int i = 0; i < words_.Count; i++)
+                return false;
+            }
+
+            if (word.Length + 1 > words_.Count)
+            {
+                return false;
+            }
+
+            return words_[word.Length].Exists(o => string.CompareOrdinal(word, o) == 0);
+        }
+
+        public bool IsValidWordSearch(string word)
+        {
+            if (word.Length == 0 || !char.IsLetter(word[0]))
+            {
+                return false;
+            }
+
+            if (word.Length + 1 > words_.Count)
+            {
+                return false;
+            }
+
+            return words_[word.Length].BinarySearch(word, StringComparer.OrdinalIgnoreCase) >= 0;
+        }
+
+        public bool IsValidWordArray(string word)
+        {
+            if (word.Length == 0 || !char.IsLetter(word[0]))
+            {
+                return false;
+            }
+
+            if (word.Length + 1 > words_.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < storage_[word.Length].Length; i++)
+            {
+                if (string.CompareOrdinal(word, storage_[word.Length][i]) == 0)
                 {
-                    words_[i].Sort();
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        string[][] storage_;
+
+        public void Complete()
+        {
+            storage_ = new string[words_.Count][];
+            for (int i = 0; i < words_.Count; i++)
+            {
+                words_[i].Sort(StringComparer.OrdinalIgnoreCase);
+                storage_[i] = new string[words_[i].Count];
+                for (int j = 0; j < words_[i].Count; j++)
+                {
+                    storage_ [i][j] = words_[i][j];
                 }
             }
         }
 
-        private bool hasSorted_ = false;
-        public bool IsValidWordSorted(ReadOnlySpan<char> word)
+        public bool IsValidWordSorted(string word)
         {
             if (word.Length == 0 || !char.IsLetter(word[0]))
             {
@@ -173,10 +228,8 @@ namespace CSharp
                 return false;
             }
 
-            CompleteSort();
-
             List<string> list = words_[word.Length];
-            string value = word.ToString().ToLower();
+            string value = word.ToLowerInvariant();
             int currentIndex = 0;
             bool doContinue = false;
             for (int i = 0; i < value.Length; i++)

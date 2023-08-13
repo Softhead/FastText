@@ -8,10 +8,11 @@ namespace CSharpBenchmark
     {
         static void Main(string[] args)
         {
+            //System.Threading.Thread.Sleep(10000);
             //Benchmark b = new();
-            //b.n_ = 370105;
+            //b.n_ = 10000;
             //b.Setup();
-            //b.LookupTrieLatin32Optimized();
+            //b.LookupListLatin();
 
             BenchmarkRunner.Run<Benchmark>();
         }
