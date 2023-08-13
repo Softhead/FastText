@@ -61,6 +61,7 @@ namespace CSharpBenchmark
                             {
                                 inWord = false;
                                 words_.Add(sb.ToString());
+                                sb.Clear();
                             }
                         }
                     }
@@ -170,6 +171,18 @@ namespace CSharpBenchmark
             foreach (string word in LookupDataWords)
             {
                 if (!ll.IsValidWordArray(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
+
+        [Benchmark]
+        public void LookupListLatinArraySearch()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!ll.IsValidWordArraySearch(word))
                 {
                     throw new Exception();
                 }

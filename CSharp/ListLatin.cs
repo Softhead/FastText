@@ -200,6 +200,21 @@ namespace CSharp
             return false;
         }
 
+        public bool IsValidWordArraySearch(string word)
+        {
+            if (word.Length == 0 || !char.IsLetter(word[0]))
+            {
+                return false;
+            }
+
+            if (word.Length + 1 > words_.Count)
+            {
+                return false;
+            }
+
+            return Array.BinarySearch(storage_[word.Length], word, StringComparer.OrdinalIgnoreCase) >= 0;
+        }
+
         string[][] storage_;
 
         public void Complete()
