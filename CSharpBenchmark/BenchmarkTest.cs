@@ -71,7 +71,7 @@ namespace CSharpBenchmark
             }
         }
 
-        [Params(10000)]//10, 100, 1000, 10_000, 1001, 370105)]
+        [Params(370105)]//10, 100, 1000, 10_000, 1001, 370105)]
         public int n_;
 
         [GlobalSetup]
@@ -141,17 +141,17 @@ namespace CSharpBenchmark
             }
         }
 
-        [Benchmark]
-        public void LookupListLatin()
-        {
-            foreach (string word in LookupDataWords)
-            {
-                if (!ll.IsValidWord(word))
-                {
-                    throw new Exception();
-                }
-            }
-        }
+        //[Benchmark]
+        //public void LookupListLatin()
+        //{
+        //    foreach (string word in LookupDataWords)
+        //    {
+        //        if (!ll.IsValidWord(word))
+        //        {
+        //            throw new Exception();
+        //        }
+        //    }
+        //}
 
         [Benchmark]
         public void LookupListLatinSorted()
@@ -165,29 +165,29 @@ namespace CSharpBenchmark
             }
         }
 
-        [Benchmark]
-        public void LookupListLatinArray()
-        {
-            foreach (string word in LookupDataWords)
-            {
-                if (!ll.IsValidWordArray(word))
-                {
-                    throw new Exception();
-                }
-            }
-        }
+        //[Benchmark]
+        //public void LookupListLatinArray()
+        //{
+        //    foreach (string word in LookupDataWords)
+        //    {
+        //        if (!ll.IsValidWordArray(word))
+        //        {
+        //            throw new Exception();
+        //        }
+        //    }
+        //}
 
-        [Benchmark]
-        public void LookupListLatinArraySearch()
-        {
-            foreach (string word in LookupDataWords)
-            {
-                if (!ll.IsValidWordArraySearch(word))
-                {
-                    throw new Exception();
-                }
-            }
-        }
+        //[Benchmark]
+        //public void LookupListLatinArraySearch()
+        //{
+        //    foreach (string word in LookupDataWords)
+        //    {
+        //        if (!ll.IsValidWordArraySearch(word))
+        //        {
+        //            throw new Exception();
+        //        }
+        //    }
+        //}
 
         [Benchmark]
         public void LookupListLatinSearch()
@@ -201,17 +201,17 @@ namespace CSharpBenchmark
             }
         }
 
-        [Benchmark]
-        public void LookupListLatinExists()
-        {
-            foreach (string word in LookupDataWords)
-            {
-                if (!ll.IsValidWordExists(word))
-                {
-                    throw new Exception();
-                }
-            }
-        }
+        //[Benchmark]
+        //public void LookupListLatinExists()
+        //{
+        //    foreach (string word in LookupDataWords)
+        //    {
+        //        if (!ll.IsValidWordExists(word))
+        //        {
+        //            throw new Exception();
+        //        }
+        //    }
+        //}
 
         [Benchmark]
         public void LookupTrieLatin32()
@@ -237,18 +237,18 @@ namespace CSharpBenchmark
             }
         }
 
-        [Benchmark]
-        public void LookupTrieLatin64Optimized()
-        {
-            if (n_ < 10_000)
-                foreach (string word in LookupDataWords)
-                {
-                    if (!tl64o.IsValidWord(word))
-                    {
-                        throw new Exception();
-                    }
-                }
-        }
+        //[Benchmark]
+        //public void LookupTrieLatin64Optimized()
+        //{
+        //    if (n_ < 10_000)
+        //        foreach (string word in LookupDataWords)
+        //        {
+        //            if (!tl64o.IsValidWord(word))
+        //            {
+        //                throw new Exception();
+        //            }
+        //        }
+        //}
 
         [Benchmark]
         public void LookupTrieLatin128Optimized()
