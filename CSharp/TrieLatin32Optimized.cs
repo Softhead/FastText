@@ -582,7 +582,7 @@ namespace CSharp
             for (int i = 1; i < length; i++)
             {
                 currentCharIndex = word[i];
-                currentCharIndex |= 0x20;  // convert to upper case
+                currentCharIndex |= 0x20;  // convert to lower case
 
                 // if the character is not a letter, then the word is not in the trie
                 if (currentCharIndex < 'a' || currentCharIndex > 'z')
