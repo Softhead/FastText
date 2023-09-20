@@ -121,7 +121,7 @@ namespace CSharpBenchmark
             _ = LookupDataWords;
         }
 
-        public HashSetLatin hsl;
+        public HashSet hsl;
         public ListLatin ll;
         public TrieLatin32 tl32;
         public TrieLatin32Optimized tl32o;

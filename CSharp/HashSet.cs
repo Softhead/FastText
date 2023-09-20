@@ -5,12 +5,12 @@ namespace CSharp
     // An array of lists.
 
     // New characters are added to the trie as a simple allocation of an additional 26 nodes.
-    public class HashSetLatin
+    public class HashSet
     {
         private HashSet<string> words_;
         private readonly Barrier ParseComplete_;
 
-        public HashSetLatin(Stream s)
+        public HashSet(Stream s)
         {
             words_ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -21,6 +21,16 @@ namespace CSharp
                     if (t.IsFaulted && t.Exception is not null) throw t.Exception;
                 });
             ParseComplete_.SignalAndWait();
+        }
+
+        public HashSet(List<string> words)
+        {
+            words_ = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (string word in words)
+            {
+                words_.Add(word);
+            }
         }
 
         private async Task ParseStream(Stream s)
