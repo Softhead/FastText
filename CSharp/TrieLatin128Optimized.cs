@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace CSharp
 {
@@ -255,12 +256,12 @@ namespace CSharp
 
             while (bytesRead != 0)
             {
-                bytesRead = await s.ReadAsync(buffer);
+                bytesRead = await s.ReadAsync(buffer).ConfigureAwait(false);
 
                 for (int i = 0; i < bytesRead; i++)
                 {
                     previousChar = currentChar;
-                    currentChar = char.ToLower((char)buffer.Span[i]);
+                    currentChar = char.ToLower((char)buffer.Span[i], CultureInfo.InvariantCulture);
 
                     // sequences of letters are treated as a word, and all other characters are considered whitespace
                     if (char.IsLetter(currentChar))

@@ -1,20 +1,15 @@
-﻿using System;
-using System.Globalization;
-using System.Reflection;
-using System.Text;
-
-namespace CSharp
+﻿namespace CSharp
 {
-    // A trie with 32 bit nodes for UTF-32 strings.
+    // A trie with 32 bit nodes for UTF-16 strings.
     //
     // To store this and the stop bit, we can use:
-    // Word 0 = the UTF-32 character
+    // Word 0 = two UTF-16 characters ('\0' indicates end of list of children)
     // Word 1 = stop bit and address of next node
     //     MSB
     //     Bit 31 = stop bit = 1 if word ends here
     //     Bit 30-0 = 31 bits for address of next node
     //
-    // In a sample of 3,000 common Japanese words, the character distribution is:
+    // In a sample of 3,000 common Japanese words, the UTF-16 character distribution is:
     // 1 = 324
     // 2 = 1450
     // 3 = 693
@@ -26,17 +21,11 @@ namespace CSharp
     {
         private const uint StopFlagBitMask = 0x8000_0000;
         private const uint AddressBitMask = 0x7fff_ffff;
-        private readonly Barrier parseComplete_;
+        private uint[] data_ = Array.Empty<uint>();
 
         public TrieUtf32(List<string> words)
         {
-            parseComplete_ = new Barrier(2);
-            _ = Task.Run(async () => { await ParseWords(words).ConfigureAwait(false); })
-                .ContinueWith((t) =>
-                {
-                    if (t.IsFaulted && t.Exception is not null) throw t.Exception;
-                });
-            parseComplete_.SignalAndWait();
+            ParseWords(words);
         }
 
         private class Trie32
@@ -46,7 +35,7 @@ namespace CSharp
             public List<Trie32> Children { get; set; } = new();
         }
 
-        private async Task ParseWords(List<string> words)
+        private void ParseWords(List<string> words)
         {
             Trie32 root = new();
             Trie32 currentNode;
@@ -100,17 +89,13 @@ namespace CSharp
             // convert to flat array
             data_ = new uint[nodeCount * 4];
             PopulateNode(root, 0);
-
-            parseComplete_.SignalAndWait();
         }
-
-        uint[] data_;
 
         private uint PopulateNode(Trie32 currentNode, uint currentIndex)
         {
             uint baseIndex = currentIndex + 1;
 
-            // fill in UTF-32 character values
+            // fill in UTF-16 character pair values
             foreach (Trie32 child in currentNode.Children)
             {
                 data_[currentIndex] = child.Data;

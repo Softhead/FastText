@@ -13,7 +13,7 @@
             WordCollection w = new();
             w.StartAdding();
 
-            Task.Run(() =>
+            _ = Task.Run(() =>
             {
                 TextReader r = new StreamReader(stream_);
                 string? line;
@@ -31,6 +31,10 @@
                 } while (stream_.CanRead);
 
                 w.CompletedAdding();
+            })
+            .ContinueWith((t) =>
+            {
+                if (t.IsFaulted && t.Exception is not null) throw t.Exception;
             });
 
             return w;

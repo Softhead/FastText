@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Globalization;
+using System.Runtime.CompilerServices;
 
 namespace CSharp
 {
@@ -182,10 +183,10 @@ namespace CSharp
             nextAvailableAddress_ = 1;
 
             parseComplete_ = new Barrier(2);
-            Task.Run(async () => { await ParseStream(s); })
+            _ = Task.Run(async () => { await ParseStream(s).ConfigureAwait(false); })
                 .ContinueWith((t) =>
                 {
-                    if (t.IsFaulted) throw t.Exception;
+                    if (t.IsFaulted && t.Exception is not null) throw t.Exception;
                 });
             parseComplete_.SignalAndWait();
         }
@@ -255,12 +256,12 @@ namespace CSharp
 
             while (bytesRead != 0)
             {
-                bytesRead = await s.ReadAsync(buffer);
+                bytesRead = await s.ReadAsync(buffer).ConfigureAwait(false);
 
                 for (int i = 0; i < bytesRead; i++)
                 {
                     previousChar = currentChar;
-                    currentChar = char.ToLower((char)buffer.Span[i]);
+                    currentChar = char.ToLower((char)buffer.Span[i], CultureInfo.InvariantCulture);
 
                     // sequences of letters are treated as a word, and all other characters are considered whitespace
                     if (char.IsLetter(currentChar))
@@ -396,7 +397,7 @@ namespace CSharp
             int minorIndex;
             for (int i = 0; i < word.Length; i++)
             {
-                currentChar = char.ToLower(word[i]);
+                currentChar = char.ToLower(word[i], CultureInfo.InvariantCulture);
                 blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);
                 minorIndex = (int)(currentAddress & BlockMinorIndexBitMask);
                 currentValue = blocks_[blockIndex][minorIndex];

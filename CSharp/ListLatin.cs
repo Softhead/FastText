@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Globalization;
+using System.Text;
 
 namespace CSharp
 {
@@ -9,13 +10,20 @@ namespace CSharp
     {
         private List<List<string>> words_;
         private readonly Barrier ParseComplete_;
+        private string[][] storage_ = Array.Empty<string[]>();
+
 
         public ListLatin(Stream s)
         {
             words_ = new List<List<string>>();
 
             ParseComplete_ = new Barrier(2);
-            Task.Run(async () => { await ParseStream(s); });
+            _ = Task.Run(async () => { await ParseStream(s).ConfigureAwait(false); })
+                .ContinueWith((t) =>
+                {
+                    if (t.IsFaulted && t.Exception is not null) throw t.Exception;
+                });
+
             ParseComplete_.SignalAndWait();
         }
 
@@ -31,7 +39,7 @@ namespace CSharp
 
             while (bytesRead != 0)
             {
-                bytesRead = await s.ReadAsync(buffer);
+                bytesRead = await s.ReadAsync(buffer).ConfigureAwait(false);
                 for (int i = 0; i < bytesRead; i++)
                 {
                     currentChar = (char)buffer.Span[i];
@@ -44,7 +52,7 @@ namespace CSharp
                             // check for end of buffer
                             if (i == bytesRead - 1)
                             {
-                                previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray()).ToLower();
+                                previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray()).ToLower(CultureInfo.InvariantCulture);
                                 currentStart = bytesRead;
                                 isCurrentlyInWord = false;
                             }
@@ -61,7 +69,7 @@ namespace CSharp
                         // end the current word
                         if (isCurrentlyInWord)
                         {
-                            string word = Encoding.UTF8.GetString(buffer[currentStart..i].ToArray()).ToLower();
+                            string word = Encoding.UTF8.GetString(buffer[currentStart..i].ToArray()).ToLower(CultureInfo.InvariantCulture);
 
                             if (previousWord is not null)
                             {
@@ -98,7 +106,7 @@ namespace CSharp
 
                 if (isCurrentlyInWord)
                 {
-                    previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray()).ToLower();
+                    previousWord = Encoding.UTF8.GetString(buffer[currentStart..bytesRead].ToArray()).ToLower(CultureInfo.InvariantCulture);
                     currentStart = 0;
                 }
             }
@@ -214,8 +222,6 @@ namespace CSharp
 
             return Array.BinarySearch(storage_[word.Length], word, StringComparer.OrdinalIgnoreCase) >= 0;
         }
-
-        string[][] storage_;
 
         public void Complete()
         {

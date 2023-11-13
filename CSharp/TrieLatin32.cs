@@ -139,7 +139,7 @@ namespace CSharp
             }
 
             // get address for first char
-            uint currentAddress = (uint)(char.ToLower(word[0]) - 'a');
+            uint currentAddress = (uint)(char.ToLower(word[0], CultureInfo.InvariantCulture) - 'a');
             uint currentValue;
             int blockIndex;
             int minorIndex;
@@ -164,7 +164,7 @@ namespace CSharp
                     return false;
                 }
                 currentAddress = (currentValue & AddressBitMask);
-                currentAddress += (uint)(char.ToLower(currentChar) - 'a');
+                currentAddress += (uint)(char.ToLower(currentChar, CultureInfo.InvariantCulture) - 'a');
             }
 
             blockIndex = (int)(currentAddress >> BitsToShiftForBlockSize);

@@ -12,7 +12,7 @@ namespace CSharpBenchmark
             //b.n_ = 3000;
             //b.Setup();
             //b.Stats();
-            //b.LookupTrieUtf32();
+            //b.LookupTrieUtf32Optimized();
             BenchmarkRunner.Run<BenchmarkUtf>();
         }
     }

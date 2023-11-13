@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using CSharp;
+using System.Diagnostics.Contracts;
 using System.Text;
 
 namespace CSharpBenchmark
@@ -7,7 +8,7 @@ namespace CSharpBenchmark
     [MemoryDiagnoser]
     public class BenchmarkUtf
     {
-        private byte[] data_;
+        private byte[] data_ = null!;
 
         private Stream DataStream
         {
@@ -76,6 +77,7 @@ namespace CSharpBenchmark
 
         public void Stats()
         {
+            Contract.Assert(words_ is not null);
             Dictionary<int, int> chars = new();
             Dictionary<int, int> words = new();
 
@@ -147,12 +149,17 @@ namespace CSharpBenchmark
 
             _ = LookupDataWords;
 
-            hsl = new(words_);
-            tu32 = new(words_);
+            if (words_ is not null)
+            {
+                hsl = new(words_);
+                tu32 = new(words_);
+                tu32o = new(words_);
+            }
         }
 
-        public HashSet hsl;
-        public TrieUtf32 tu32;
+        public HashSet hsl = null!;
+        public TrieUtf32 tu32 = null!;
+        public TrieUtf32Optimized tu32o = null!;
 
         [Benchmark]
         public void LookupHashSetLatin()
@@ -172,6 +179,18 @@ namespace CSharpBenchmark
             foreach (string word in LookupDataWords)
             {
                 if (!tu32.IsValidWord(word))
+                {
+                    throw new Exception();
+                }
+            }
+        }
+
+        [Benchmark]
+        public void LookupTrieUtf32Optimized()
+        {
+            foreach (string word in LookupDataWords)
+            {
+                if (!tu32o.IsValidWord(word))
                 {
                     throw new Exception();
                 }

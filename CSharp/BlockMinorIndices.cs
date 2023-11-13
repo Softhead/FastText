@@ -1,10 +1,11 @@
-﻿using System.Runtime.CompilerServices;
+﻿using System.Diagnostics.Contracts;
+using System.Runtime.CompilerServices;
 
 namespace CSharp
 {
     internal class BlockMinorIndices
     {
-        private static List<uint[]> blocks_;
+        private static List<uint[]> blocks_ = null!;
         private static int blockSize_;
         private static int BitsToShiftForBlockSize;
         private static int BlockMinorIndexBitMask;
@@ -14,6 +15,8 @@ namespace CSharp
 
         public static void Initialize(List<uint[]> blocks, int blockSize, uint addressBitMask)
         {
+            Contract.Assert(blocks is not null);
+
             blocks_ = blocks;
             blockSize_ = blockSize;
             BitsToShiftForBlockSize = (int)Math.Log2(blockSize);
@@ -69,7 +72,7 @@ namespace CSharp
 
         public uint GetAddress()
         {
-            return (uint) (blockIndex_ * blockSize_ + minorIndex_);
+            return (uint)(blockIndex_ * blockSize_ + minorIndex_);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

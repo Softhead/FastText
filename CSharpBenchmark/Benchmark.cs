@@ -7,7 +7,7 @@ namespace CSharpBenchmark
     [MemoryDiagnoser]
     public class Benchmark
     {
-        private byte[] data_;
+        private byte[] data_ = Array.Empty<byte>();
 
         private Stream DataStream
         {
@@ -121,12 +121,12 @@ namespace CSharpBenchmark
             _ = LookupDataWords;
         }
 
-        public HashSet hsl;
-        public ListLatin ll;
-        public TrieLatin32 tl32;
-        public TrieLatin32Optimized tl32o;
-        public TrieLatin64Optimized tl64o;
-        public TrieLatin128Optimized tl128o;
+        public HashSet hsl = null!;
+        public ListLatin ll = null!;
+        public TrieLatin32 tl32 = null!;
+        public TrieLatin32Optimized tl32o = null!;
+        public TrieLatin64Optimized tl64o = null!;
+        public TrieLatin128Optimized tl128o = null!;
 
 
         [Benchmark]

@@ -64,7 +64,7 @@ namespace FastText
                     {
                         try
                         {
-                            Task.Delay(TimeSpan.FromSeconds(1), CancellationTokenSource_.Token);
+                            Task.Delay(TimeSpan.FromSeconds(1), CancellationTokenSource_.Token).GetAwaiter().GetResult();
                         }
                         catch { }
                     }

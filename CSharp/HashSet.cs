@@ -8,7 +8,7 @@ namespace CSharp
     public class HashSet
     {
         private HashSet<string> words_;
-        private readonly Barrier ParseComplete_;
+        private readonly Barrier ParseComplete_ = null!;
 
         public HashSet(Stream s)
         {

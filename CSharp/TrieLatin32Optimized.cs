@@ -49,6 +49,7 @@ namespace CSharp
         private readonly Dictionary<uint, uint> backPointersKeyDestinationAddress_ = new();
         private readonly Queue<uint> free3Tries_ = new();
         private readonly Barrier parseComplete_;
+        private uint[] storage_ = Array.Empty<uint>();
 
         public TrieLatin32Optimized(Stream s)
         {
@@ -541,8 +542,6 @@ namespace CSharp
 
             return false;
         }
-
-        uint[] storage_;
 
         public void SetupStorage()
         {
