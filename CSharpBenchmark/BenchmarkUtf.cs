@@ -1,5 +1,6 @@
 ﻿using BenchmarkDotNet.Attributes;
 using CSharp;
+using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.Contracts;
 using System.Text;
 
@@ -78,12 +79,15 @@ namespace CSharpBenchmark
         public void Stats()
         {
             Contract.Assert(words_ is not null);
-            Dictionary<int, int> chars = new();
-            Dictionary<int, int> words = new();
+            Dictionary<int, int> chars = new();  // length, count
+            Dictionary<int, int> words = new();  // length, count
+            Dictionary<int, Dictionary<char, int>> charFreq = new();  // position, dictionary of char, count
 
             foreach (string word in words_)
             {
                 byte[] bytes = Encoding.Unicode.GetBytes(word);
+
+                // word length
                 if (words.ContainsKey(bytes.Length))
                 {
                     words[bytes.Length]++;
@@ -93,6 +97,7 @@ namespace CSharpBenchmark
                     words.Add(bytes.Length, 1);
                 }
 
+                // char length
                 for (int index = 0; index < word.Length; index++)
                 {
                     bytes = Encoding.Unicode.GetBytes(word, index, 1);
@@ -103,6 +108,25 @@ namespace CSharpBenchmark
                     else
                     {
                         chars.Add(bytes.Length, 1);
+                    }
+                }
+
+                // distinct chars at each position
+                for (int index = 0; index < word.Length; index++)
+                {
+                    if (!charFreq.TryGetValue(index, out Dictionary<char, int>? dict))
+                    {
+                        dict = new Dictionary<char, int>();
+                        charFreq.Add(index, dict);
+                    }
+
+                    if (dict.ContainsKey(word[index]))
+                    {
+                        dict[word[index]]++;
+                    }
+                    else
+                    {
+                        dict.Add(word[index], 1);
                     }
                 }
             }
@@ -116,9 +140,20 @@ namespace CSharpBenchmark
             {
                 Console.WriteLine($"Word length {key} count {words[key]}");
             }
+
+            foreach (int key in charFreq.Keys.Order())
+            {
+                Console.WriteLine($"Word position {key} distinct char count {charFreq[key].Count}");
+                Dictionary<char, int> dict = charFreq[key];
+                IOrderedEnumerable<KeyValuePair<char, int>> bigOnes = dict.OrderByDescending(o => o.Value);
+                foreach (var bigOne in bigOnes.Take(5))
+                {
+                    Console.WriteLine($"    Char {bigOne.Key} count {bigOne.Value}");
+                }
+            }
         }
 
-        [Params(3000)]//10, 100, 1000, 10_000)]
+        [Params(3000, 10_000)]
         public int n_;
 
         [GlobalSetup]
@@ -127,6 +162,10 @@ namespace CSharpBenchmark
             if (n_ == 3000)
             {
                 data_ = File.ReadAllBytes("c:\\SoftHead\\FastText\\3000 common JP words.txt");
+            }
+            else if (n_ == 10_000)
+            {
+                data_ = File.ReadAllBytes("c:\\SoftHead\\FastText\\10_000 JP words.txt");
             }
             else
             {
