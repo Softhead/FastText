@@ -2,6 +2,7 @@
 using CSharp;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.Contracts;
+using System.Security.AccessControl;
 using System.Text;
 
 namespace CSharpBenchmark
@@ -82,6 +83,9 @@ namespace CSharpBenchmark
             Dictionary<int, int> chars = new();  // length, count
             Dictionary<int, int> words = new();  // length, count
             Dictionary<int, Dictionary<char, int>> charFreq = new();  // position, dictionary of char, count
+            Dictionary<char, int> charCommon = new();  // char, count at any position
+            uint minChar = 0xffffffff;
+            uint maxChar = 0;
 
             foreach (string word in words_)
             {
@@ -129,6 +133,29 @@ namespace CSharpBenchmark
                         dict.Add(word[index], 1);
                     }
                 }
+
+                for (int index = 0; index < word.Length; index++)
+                {
+                    // common chars at each position
+                    if (charCommon.ContainsKey(word[index]))
+                    {
+                        charCommon[word[index]]++;
+                    }
+                    else
+                    {
+                        charCommon.Add(word[index], 1);
+                    }
+
+                    // char min/max
+                    if (word[index] > maxChar)
+                    {
+                        maxChar = word[index];
+                    }
+                    if (word[index] < minChar)
+                    {
+                        minChar = word[index];
+                    }
+                }
             }
 
             foreach (int key in chars.Keys.Order())
@@ -148,9 +175,63 @@ namespace CSharpBenchmark
                 IOrderedEnumerable<KeyValuePair<char, int>> bigOnes = dict.OrderByDescending(o => o.Value);
                 foreach (var bigOne in bigOnes.Take(5))
                 {
-                    Console.WriteLine($"    Char {bigOne.Key} count {bigOne.Value}");
+                    Console.WriteLine($"    Char {(uint)bigOne.Key} count {bigOne.Value}");
                 }
             }
+
+            int totalCharCount = 0;
+            foreach (char ckey in charCommon.Keys)
+            {
+                totalCharCount += charCommon[ckey];
+            }
+            IOrderedEnumerable<KeyValuePair<char, int>> commonOnes = charCommon.OrderByDescending(o => o.Value);
+            int cumulativeCount = 0;
+            foreach (var commonOne in commonOnes.Take(100))
+            {
+                cumulativeCount += commonOne.Value;
+                Console.WriteLine($"Char {(uint)commonOne.Key} count {commonOne.Value} cumulative {100 * cumulativeCount / totalCharCount}");
+            }
+
+            Console.WriteLine($"Min char value {minChar}");
+            Console.WriteLine($"Max char value {maxChar}");
+
+            IEnumerable<uint> listCommon = charCommon.Keys.OrderBy(o => o).Select(o => (uint)o);
+            foreach (var listOne in listCommon)
+            {
+                Console.WriteLine($"Char value {listOne}");
+            }
+
+            Dictionary<uint, int> hashCount = new();
+            foreach (var listOne in listCommon)
+            {
+                uint hash = HashFunc(listOne);
+
+                if (hashCount.ContainsKey(hash))
+                {
+                    hashCount[hash]++;
+                }
+                else
+                {
+                    hashCount.Add(hash, 1);
+                }
+            }
+
+            foreach (var hashKey in hashCount.Keys.OrderBy(o => o))
+            {
+                Console.WriteLine($"Hash value {hashKey} count {hashCount[hashKey]}");
+            }
+        }
+
+        private uint HashFunc(uint data)
+        {
+            uint result = data & 0xff;
+            data >>= 8;
+            result += data;
+            data >>= 8;
+            result += data;
+            data >>= 8;
+            result += data;
+            return result & 0xff;
         }
 
         [Params(3000, 10_000)]
